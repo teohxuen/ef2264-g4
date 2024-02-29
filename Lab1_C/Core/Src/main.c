@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -134,7 +135,31 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI2_Init();
   MX_SPI3_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
+
+	//some variables for FatFs
+	FATFS FatFs; 	//Fatfs handle
+	FRESULT fres; //Result after operations
+
+  fres = f_mount(&FatFs, "", 1); //1=mount now
+  if (fres != FR_OK) {
+	  myprintf("f_mount error (%i)\r\n", fres);
+	  while(1);
+  }
+
+  DWORD free_clusters, free_sectors, total_sectors;
+  FATFS* getFreeFs;
+
+  fres = f_getfree("", &free_clusters, &getFreeFs);
+  if (fres != FR_OK) {
+	  myprintf("f_getfree error (%i)\r\n", fres);
+	  while(1);
+  }
+  total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
+  free_sectors = free_clusters * getFreeFs->csize;
+
+  myprintf("SD card stats:\r\n%ld kB total drive space.\r\n%ld kB available.\r\n", total_sectors / 2, free_sectors / 2);
 
   // LED on
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
@@ -322,7 +347,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_HARD_OUTPUT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
