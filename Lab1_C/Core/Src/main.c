@@ -257,8 +257,7 @@ int main(void) {
 		}
 
 		curr_tick = HAL_GetTick();
-		// to be fixed
-		time = (curr_tick - init_tick) / 1000;
+		time = (float)(curr_tick - init_tick) / 1000;
 
 #ifdef DEBUG_PRINT
 		myprintf("Light: %.2f lux\r\n", lux);
@@ -272,7 +271,7 @@ int main(void) {
 		// write data to SD card
 		fres = f_open(&fil, "data.txt", FA_WRITE | FA_OPEN_APPEND);
 		f_lseek(&fil, f_size(&fil)); //put the file pointer to end of file
-		str_buf_len = sprintf(str_buf, "%.2f;%.2f;%.2f\r\n", time, temp, lux); // generate string to write
+		str_buf_len = sprintf(str_buf, "%.3f;%.2f;%.2f\r\n", time, temp, lux); // generate string to write
 		fres = f_write(&fil, str_buf, str_buf_len, &bytesWrote); //write
 		f_close(&fil); // close file
 
