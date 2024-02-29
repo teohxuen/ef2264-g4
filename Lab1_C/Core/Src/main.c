@@ -35,6 +35,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 //#define DEBUG_PRINT
+#define BINARY_WRITE
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -127,6 +128,7 @@ int main(void) {
 	FIL fil;
 	UINT bytesWrote;
 	char str_buf[100];
+	float write_buf[3];
 	int str_buf_len;
 
 	/* USER CODE END 1 */
@@ -187,14 +189,18 @@ int main(void) {
 	myprintf(
 			"SD card stats:\r\n%ld kB total drive space.\r\n%ld kB available.\r\n",
 			total_sectors / 2, free_sectors / 2);
-
+#ifdef BINARY_WRITE
+	// Write File Header
+	fres = f_open(&fil, "data.bin", FA_CREATE_ALWAYS | FA_WRITE); // new file is created
+	f_close(&fil); // close file
+#else
 	// Write File Header
 	fres = f_open(&fil, "data.txt", FA_CREATE_ALWAYS | FA_WRITE); // new file is created
 	f_lseek(&fil, f_size(&fil)); //put the file pointer to end of file
 	str_buf_len = sprintf(str_buf, "Time; Temperature; Luminosity\r\n"); // generate string to write
 	fres = f_write(&fil, str_buf, str_buf_len, &bytesWrote); //write
 	f_close(&fil); // close file
-
+#endif
 	// LED on
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); //PA5 is Green LED
 	led_tick = HAL_GetTick();
@@ -268,17 +274,30 @@ int main(void) {
 		myprintf("Temp : %.2f\r\n", temp);
 #endif
 
+
 		// write data to SD card
+#ifdef BINARY_WRITE
+		fres = f_open(&fil, "data.bin", FA_WRITE | FA_OPEN_APPEND);
+		// 4 Byte 4 Byte 4 Byte
+		// <Time><Temp><Luminosity>
+		write_buf[0] = time;
+		write_buf[1] = temp;
+		write_buf[2] = lux;
+		fres = f_write(&fil,write_buf,sizeof(write_buf),&bytesWrote);
+		f_close(&fil); // close file
+#else
 		fres = f_open(&fil, "data.txt", FA_WRITE | FA_OPEN_APPEND);
 		f_lseek(&fil, f_size(&fil)); //put the file pointer to end of file
 		str_buf_len = sprintf(str_buf, "%.3f;%.2f;%.2f\r\n", time, temp, lux); // generate string to write
 		fres = f_write(&fil, str_buf, str_buf_len, &bytesWrote); //write
 		f_close(&fil); // close file
+#endif
 
 		delta_tick = HAL_GetTick() - prev_tick;
 		prev_tick = HAL_GetTick();
 
 		myprintf("Time between measurement: %d\r\n", delta_tick);
+
 		// check if writing worked
 #ifdef DEBUG_PRINT
 		if (fres == FR_OK) {
