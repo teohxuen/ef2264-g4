@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2024 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -34,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+//#define DEBUG_PRINT
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,8 +45,8 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
-SPI_HandleTypeDef hspi2;
-SPI_HandleTypeDef hspi3;
+SPI_HandleTypeDef hspi2; // SD card
+SPI_HandleTypeDef hspi3; // Temperature Sensor
 
 UART_HandleTypeDef huart2;
 
@@ -54,13 +54,15 @@ UART_HandleTypeDef huart2;
 // Memory Address for Light Sensor
 uint8_t BH1721_ADDR_read = 0x47; // Use 7-bit address + R/W bit
 uint8_t BH1721_ADDR_write = 0x46; // Use 7-bit address + R/W bit
-uint8_t BH1721_start= 0x01; // Power On
-uint8_t BH1721_LRC= 0x13; // continuous low resolution (largest range)
+uint8_t BH1721_start = 0x01; // Power On
+uint8_t BH1721_LRC = 0x13; // continuous low resolution (largest range)
 
 // For Temperature Sensor
 uint8_t TC72_WR = 0x80;
 uint8_t TC72_OP = 0x12;
 uint8_t TC72_RR = 0x03;
+
+uint8_t unmount = 0;
 
 /* USER CODE END PV */
 
@@ -77,6 +79,13 @@ void myprintf(const char *fmt, ...);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// Interrrupt Handler for Blue Button
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if (GPIO_Pin == B1_Pin){
+		unmount = 1;
+	}
+}
+
 void myprintf(const char *fmt, ...) {
 	static char buffer[512];
 	va_list args;
@@ -105,11 +114,21 @@ int main(void)
 	float lux;
 	float temp;
 
+	uint32_t prev_tick;
+	uint32_t curr_tick;
+	uint32_t delta_tick;
+	uint32_t init_tick;
+	uint32_t led_tick;
+	float time;
+	uint8_t led_state;
 
-	ret = HAL_I2C_Master_Transmit(&hi2c1, BH1721_ADDR_write, &BH1721_start, 1, HAL_MAX_DELAY); // Tell BH1721 to start measurements
-	if ( ret != HAL_OK ) {
-		myprintf("Error!\n"); // error message in UART
-	}
+	//some variables for FatFs
+	FATFS FatFs; 	//Fatfs handle
+	FRESULT fres; //Result after operations
+	FIL fil;
+	UINT bytesWrote;
+	char str_buf[100];
+	int str_buf_len;
 
   /* USER CODE END 1 */
 
@@ -138,92 +157,163 @@ int main(void)
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
-	//some variables for FatFs
-	FATFS FatFs; 	//Fatfs handle
-	FRESULT fres; //Result after operations
+	// Tell BH1721 to start measurements
+	ret = HAL_I2C_Master_Transmit(&hi2c1, BH1721_ADDR_write, &BH1721_start, 1,
+			HAL_MAX_DELAY);
+	if (ret != HAL_OK) {
+		myprintf("Error!\n"); // error message in UART
+	}
 
-  fres = f_mount(&FatFs, "", 1); //1=mount now
-  if (fres != FR_OK) {
-	  myprintf("f_mount error (%i)\r\n", fres);
-	  while(1);
-  }
+	// Mount SD Card
+	fres = f_mount(&FatFs, "", 1); //1=mount now
+	if (fres != FR_OK) {
+		myprintf("f_mount error (%i)\r\n", fres);
+		while (1)
+			;
+	}
 
-  DWORD free_clusters, free_sectors, total_sectors;
-  FATFS* getFreeFs;
+	// Check available space on SD Card
+	DWORD free_clusters, free_sectors, total_sectors;
+	FATFS *getFreeFs;
 
-  fres = f_getfree("", &free_clusters, &getFreeFs);
-  if (fres != FR_OK) {
-	  myprintf("f_getfree error (%i)\r\n", fres);
-	  while(1);
-  }
-  total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
-  free_sectors = free_clusters * getFreeFs->csize;
+	fres = f_getfree("", &free_clusters, &getFreeFs);
+	if (fres != FR_OK) {
+		myprintf("f_getfree error (%i)\r\n", fres);
+		while (1)
+			;
+	}
+	total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
+	free_sectors = free_clusters * getFreeFs->csize;
 
-  myprintf("SD card stats:\r\n%ld kB total drive space.\r\n%ld kB available.\r\n", total_sectors / 2, free_sectors / 2);
+	myprintf(
+			"SD card stats:\r\n%ld kB total drive space.\r\n%ld kB available.\r\n",
+			total_sectors / 2, free_sectors / 2);
 
-  // LED on
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+	// Write File Header
+	fres = f_open(&fil, "data.txt", FA_CREATE_ALWAYS | FA_WRITE); // new file is created
+	f_lseek(&fil, f_size(&fil)); //put the file pointer to end of file
+	str_buf_len = sprintf(str_buf, "Time; Temperature; Luminosity\r\n"); // generate string to write
+	fres = f_write(&fil, str_buf, str_buf_len, &bytesWrote); //write
+	f_close(&fil); // close file
 
-  // Configure BH1721 to do low resolution continuously
-  ret = HAL_I2C_Master_Transmit(&hi2c1, BH1721_ADDR_write, &BH1721_LRC, 1, HAL_MAX_DELAY);
-  if ( ret != HAL_OK ) {
-	  myprintf("Error!\n"); // error message in UART
-  }
+	// LED on
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); //PA5 is Green LED
+	led_tick = HAL_GetTick();
+	led_state = ~0;
 
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // SPI3 CS on
-  HAL_SPI_Transmit(&hspi3, (uint8_t *)&TC72_WR, 1, HAL_MAX_DELAY);
-  HAL_SPI_Transmit(&hspi3, (uint8_t *)&TC72_OP, 1, HAL_MAX_DELAY);
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // SPI3 CS off
+	// Set SPI3 CS Low
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
 
+	// Configure BH1721 to do low resolution continuously
+	ret = HAL_I2C_Master_Transmit(&hi2c1, BH1721_ADDR_write, &BH1721_LRC, 1,
+			HAL_MAX_DELAY);
+	if (ret != HAL_OK) {
+		myprintf("Error!\n"); // error message in UART
+	}
+
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // SPI3 CS on
+	HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_WR, 1, HAL_MAX_DELAY);
+	HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_OP, 1, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // SPI3 CS off
+
+	init_tick = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-	  ret = HAL_I2C_Master_Receive(&hi2c1, BH1721_ADDR_read, buf, 2, HAL_MAX_DELAY); // Read 2 bytes from BH1721 into a buffer
-	  if ( ret != HAL_OK ) {
-		  myprintf("Error!\n"); // error message in UART
-	  }
+	while (1) {
 
-	  // Convert into Lux
-	  light_val = (buf[0]<<8) | buf[1];
-	  lux = light_val/1.2;
-	  myprintf("Light: %.2f lux\r\n", lux);
+		// Read 2 bytes from BH1721 into a buffer
+		ret = HAL_I2C_Master_Receive(&hi2c1, BH1721_ADDR_read, buf, 2,
+				HAL_MAX_DELAY);
+		if (ret != HAL_OK) {
+			myprintf("Error!\n"); // error message in UART
+		}
 
+		// Convert into Lux
+		light_val = (buf[0] << 8) | buf[1];
+		lux = light_val / 1.2;
 
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // SPI3 CS on
-	  HAL_SPI_Transmit(&hspi3, (uint8_t *)&TC72_WR, 1, HAL_MAX_DELAY);
-	  HAL_SPI_Transmit(&hspi3, (uint8_t *)&TC72_OP, 1, HAL_MAX_DELAY);
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // SPI3 CS off
+		// Send 0x80 and 0x12 to Temp Sensor
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // SPI3 CS on
+		HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_WR, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_OP, 1, HAL_MAX_DELAY);
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // SPI3 CS off
 
-	  HAL_Delay(150);
+		HAL_Delay(150);
 
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // SPI3 CS on
-	  HAL_SPI_Transmit(&hspi3, (uint8_t *)&TC72_RR, 1, HAL_MAX_DELAY);
-	  HAL_SPI_Receive(&hspi3, (uint8_t *)spi_buf, 4, HAL_MAX_DELAY);
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // SPI3 CS off
+		// Send 0x03 to Temp Sensor and Read 4 Bytes into SPI Buffer
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // SPI3 CS on
+		HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_RR, 1, HAL_MAX_DELAY);
+		HAL_SPI_Receive(&hspi3, (uint8_t*) spi_buf, 4, HAL_MAX_DELAY);
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // SPI3 CS off
 
-	  myprintf("Temp Val: %x %x %x %x\r\n",spi_buf[0],
-			spi_buf[1],
-			spi_buf[2],
-			spi_buf[3]);
+		// Convert Temp Data into Celsius
+		flag = spi_buf[2] >> 6; //right shift by 6 bits
 
-	 flag = spi_buf[2] >> 6; //right shift by 6 bits
+		if (spi_buf[1] >= 128) { //cause 128 means -0
+			temp = -((spi_buf[1]) - 128) - (flag * 0.25);
+		} else {
+			temp = spi_buf[1] + (flag * 0.25);
+		}
 
-	 if (spi_buf[1] >= 128) { //cause 128 means -0
-		temp = -((spi_buf[1]) - 128)-(flag * 0.25);
-	 }
-	else {
-		temp = spi_buf[1]+(flag * 0.25);
+		curr_tick = HAL_GetTick();
+		// to be fixed
+		time = (curr_tick - init_tick)/1000;
+
+#ifdef DEBUG_PRINT
+		myprintf("Light: %.2f lux\r\n", lux);
+
+		myprintf("Temp Val: %x %x %x %x\r\n", spi_buf[0], spi_buf[1],
+				spi_buf[2], spi_buf[3]);
+
+		myprintf("Temp : %.2f\r\n", temp);
+#endif
+
+		// write data to SD card
+		fres = f_open(&fil, "data.txt", FA_WRITE | FA_OPEN_APPEND);
+		f_lseek(&fil, f_size(&fil)); //put the file pointer to end of file
+		str_buf_len = sprintf(str_buf, "%.2f;%.2f;%.2f\r\n", time, temp, lux); // generate string to write
+		fres = f_write(&fil, str_buf, str_buf_len, &bytesWrote); //write
+		f_close(&fil); // close file
+
+		delta_tick = HAL_GetTick() - prev_tick;
+		prev_tick = HAL_GetTick();
+
+		myprintf("Time between measurement: %d\r\n", delta_tick);
+		// check if writing worked
+#ifdef DEBUG_PRINT
+		if (fres == FR_OK) {
+			myprintf("Wrote %i bytes to 'data.txt'!\r\n", bytesWrote);
+		} else {
+			myprintf("f_write error\r\n");
+		}
+#endif
+
+	// If blue button is pressed, unmount SD Card
+	if (unmount){
+		fres = f_mount(NULL, "", 1);
+		if (fres == FR_OK) {
+			myprintf("SD CARD UNMOUNTED successfully...\r\n");
+		}
+		while(1); // Halt the programme
 	}
-	 myprintf("Temp : %f\r\n",temp);
 
+	// Turn off LED
+	if (HAL_GetTick() - led_tick > 500) {
+		if (led_state) {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+		}
+		else {
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+		}
+		led_state = ~led_state; // Invert LED State
+		led_tick = HAL_GetTick();
+	}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+	}
   /* USER CODE END 3 */
 }
 
@@ -472,6 +562,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -487,11 +581,10 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1) {
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 
