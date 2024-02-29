@@ -6,8 +6,8 @@
 
 
 ### Code Defines:
-- `#define BINARY_WRITE` writes in Binary format to the file. Without `#define BINARY_WRITE` it will write to the file in formatted text values.
-- `#define DEBUG_PRINT` prints the value of the sensor every time. Without `#define DEBUG_PRINT` it will only print the time difference between readings. 
+- `#define BINARY_WRITE` writes in Binary format to the file. If `#define BINARY_WRITE` is commented out, it will write to the file in formatted text values.
+- `#define DEBUG_PRINT` prints the value of the sensor every time. If `#define DEBUG_PRINT` is commented out, it will only print the time difference between readings. 
 
 ### Current Features:
 - Read Data from Sensors
@@ -18,5 +18,6 @@
 
 ### Things to Do:
 - Fix Temperature Data
-- Plot Data using Matlab/Python
+- Plot Data using Matlab/Python for text file
+- Plot Data using Matlab/Python for Binary File
 - Real Time Visual Interface 
