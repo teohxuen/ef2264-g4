@@ -189,6 +189,7 @@ int main(void) {
 	myprintf(
 			"SD card stats:\r\n%ld kB total drive space.\r\n%ld kB available.\r\n",
 			total_sectors / 2, free_sectors / 2);
+
 #ifdef BINARY_WRITE
 	// Write File Header
 	fres = f_open(&fil, "data.bin", FA_CREATE_ALWAYS | FA_WRITE); // new file is created
@@ -263,7 +264,7 @@ int main(void) {
 		}
 
 		curr_tick = HAL_GetTick();
-		time = (float)(curr_tick - init_tick) / 1000;
+		time = (float) (curr_tick - init_tick) / 1000;
 
 #ifdef DEBUG_PRINT
 		myprintf("Light: %.2f lux\r\n", lux);
@@ -274,7 +275,6 @@ int main(void) {
 		myprintf("Temp : %.2f\r\n", temp);
 #endif
 
-
 		// write data to SD card
 #ifdef BINARY_WRITE
 		fres = f_open(&fil, "data.bin", FA_WRITE | FA_OPEN_APPEND);
@@ -283,7 +283,7 @@ int main(void) {
 		write_buf[0] = time;
 		write_buf[1] = temp;
 		write_buf[2] = lux;
-		fres = f_write(&fil,write_buf,sizeof(write_buf),&bytesWrote);
+		fres = f_write(&fil, write_buf, sizeof(write_buf), &bytesWrote);
 		f_close(&fil); // close file
 #else
 		fres = f_open(&fil, "data.txt", FA_WRITE | FA_OPEN_APPEND);
