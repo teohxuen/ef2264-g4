@@ -21,3 +21,4 @@
 
 ### Things to Do:
 - Fix Temperature Data for C Code
+- Write down the pinout to make life easier
