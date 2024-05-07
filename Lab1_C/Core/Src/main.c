@@ -35,6 +35,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define DEBUG_PRINT
+#define REALTIME
 //#define BINARY_WRITE
 /* USER CODE END PD */
 
@@ -274,6 +275,10 @@ int main(void) {
 				spi_buf[2], spi_buf[3]);
 
 		myprintf("Temp : %.2f\r\n", temp);
+#endif
+
+#ifdef REALTIME
+		myprintf("LIVE,%.2f,%.2f\r\n", temp, lux);
 #endif
 
 		// write data to SD card
