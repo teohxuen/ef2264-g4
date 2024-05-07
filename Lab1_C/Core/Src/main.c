@@ -34,8 +34,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-//#define DEBUG_PRINT
-#define BINARY_WRITE
+#define DEBUG_PRINT
+//#define BINARY_WRITE
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,7 +60,8 @@ uint8_t BH1721_LRC = 0x13; // continuous low resolution (largest range)
 
 // For Temperature Sensor
 uint8_t TC72_WR = 0x80;
-uint8_t TC72_OP = 0x12;
+uint8_t TC72_TEMP = 0x15;
+uint8_t TC72_OP = 0x14;
 uint8_t TC72_RR = 0x03;
 
 uint8_t unmount = 0;
@@ -240,10 +241,10 @@ int main(void) {
 		light_val = (buf[0] << 8) | buf[1];
 		lux = light_val / 1.2;
 
-		// Send 0x80 and 0x12 to Temp Sensor
+		// Send 0x80 and 0x15 to Temp Sensor
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // SPI3 CS on
 		HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_WR, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_OP, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, (uint8_t*) &TC72_TEMP, 1, HAL_MAX_DELAY);
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // SPI3 CS off
 
 		HAL_Delay(150);
