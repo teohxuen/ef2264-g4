@@ -1,8 +1,8 @@
 # For STM32CubeIDE:
 ### STM32 Connections:
-- Temperature Sensor: SPI3
+- Temperature Sensor: SPI2
 - Light Sensor: I2C1
-- SD Card Reader: SPI2
+- SD Card Reader: SPI3
 
 
 ### Code Defines:

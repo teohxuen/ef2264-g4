@@ -4,10 +4,10 @@ from machine import SPI,Pin
 from machine import I2C,Pin
 
 #temperature sensor 
-spi_T=machine.SPI(1, baudrate=400000, polarity=0, phase=1, bits=8,
+spi_T=machine.SPI(2, baudrate=400000, polarity=0, phase=1, bits=8,
 firstbit=SPI.MSB)
 
-cs_T = Pin('PA4', mode=Pin.OUT, value=0) #output pin configuration
+cs_T = Pin('PB1', mode=Pin.OUT, value=0) #output pin configuration
 cs_T(0) #pin off
 cs_T(1) #pin on
 
