@@ -8,10 +8,10 @@ from machine import I2C,Pin
 init_time=time.ticks_ms()
 T_o=init_time
 #temperature sensor 
-spi_T=machine.SPI(1, baudrate=7000000, polarity=0, phase=1, bits=8,
+spi_T=machine.SPI(2, baudrate=400000, polarity=0, phase=1, bits=8,
 firstbit=SPI.MSB)
 
-cs_T = Pin('PA4', mode=Pin.OUT, value=0) #output pin configuration
+cs_T = Pin('PB1', mode=Pin.OUT, value=0) #output pin configuration
 cs_T(0) #pin off
 cs_T(1) #pin on
 
@@ -26,7 +26,7 @@ i2c.writeto(0x23, b'\x01') # power on
 i2c.writeto(0x23, b'\x13') # cont. large range
 
 # init SDcard SPI
-sd = sdcard.SDCard(machine.SPI(2), machine.Pin('PB12'))
+sd = sdcard.SDCard(machine.SPI(1), machine.Pin('PA4'))
 # mount sd card to uC system
 os.mount(sd, '/sd')
 
