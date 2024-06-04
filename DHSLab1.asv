@@ -1,8 +1,8 @@
 clc; clear;
-m=readmatrix('measurement.txt','NumHeaderLines',1)
+m=readmatrix("measurement.txt','NumHeaderLines',1)
 figure(1);
 plot(m(:,1),m(:,2))
-hold on;title("Temperature");xlabel('Time [m]');ylabel('Temperature [ºC]'); hold off;
+hold on;title("Temperature Fixed");xlabel('Time [m]');ylabel('Temperature [ºC]'); hold off;
 
 n=NaN;
 for i=1:length(m)
